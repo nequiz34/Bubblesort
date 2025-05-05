@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+    <link rel="stylesheet" href="bubble.html">
+<head>
+    <title>Bubble Sort con Base de Datos</title>
+    <!-- Estilos anteriores se mantienen -->
+    <style>
+        /* ... (mantener los mismos estilos del código anterior) ... */
+        
+        .history-container {
+            margin: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <button onclick="generarArray()">Nuevo Array</button>
+    <button onclick="iniciarSort()">Ordenar</button>
+    <button onclick="mostrarHistorial()">Mostrar Historial</button>
+    <button onclick="limpiarHistorial()">Limpiar Historial</button>
+    <div class="container" id="container"></div>
+    <div class="history-container" id="history"></div>
+
+    <script>
+        // Configuración inicial
+        const container = document.getElementById('container');
+        const historyContainer = document.getElementById('history');
+        let array = [];
+        const tamañoArray = 20;
+        let delay = 100;
+        
+        // Configuración de IndexedDB
+        let db;
+        const DB_NAME = 'SortingDB';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'sortingHistory';
+
+        // Abrir/Crear base de datos
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+        request.onupgradeneeded = (event) => {
+            db = event.target.result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+                const store = db.createObjectStore(STORE_NAME, {
+                    keyPath: 'id',
+                    autoIncrement: true
+                });
+                
+                // Crear índices para búsquedas
+                store.createIndex('timestamp', 'timestamp', { unique: false });
+                store.createIndex('timeTaken', 'timeTaken', { unique: false });
+            }
+        };
+
+        request.onsuccess = (event) => {
+            db = event.target.result;
+            cargarHistorial();
+        };
+
+        request.onerror = (event) => {
+            console.error('Error al abrir la base de datos', event);
+        };
+
+        // Funciones de base de datos
+        function guardarEnHistorial(datos) {
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            store.add(datos);
+        }
+
+        async function cargarHistorial() {
+            historyContainer.innerHTML = 'Cargando historial...';
+            const transaction = db.transaction([STORE_NAME], 'readonly');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.getAll();
+
+            request.onsuccess = (event) => {
+                mostrarHistorialEnPantalla(event.target.result);
+            };
+        }
+
+        function limpiarHistorial() {
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            store.clear();
+            historyContainer.innerHTML = 'Historial limpiado';
+        }
+
+        // Funciones modificadas del sort
+        async function bubbleSort() {
+            const startTime = performance.now();
+            let comparaciones = 0;
+            let intercambios = 0;
+            
+            const barras = document.getElementsByClassName('bar');
+            for(let i = 0; i < array.length; i++) {
+                for(let j = 0; j < array.length - i - 1; j++) {
+                    comparaciones++;
+                    
+                    // ... (código de comparación anterior) ...
+                    
+                    if(array[j] > array[j + 1]) {
+                        intercambios++;
+                        // ... (código de intercambio anterior) ...
+                    }
+                    
+                    // ... (código de remoción de clases anterior) ...
+                }
+                // ... (código de marcado anterior) ...
+            }
+            
+            const endTime = performance.now();
+            const tiempoEjecucion = (endTime - startTime).toFixed(2);
+            
+            // Guardar en base de datos
+            guardarEnHistorial({
+                arrayOriginal: [...array],
+                arrayOrdenado: [...array],
+                timestamp: new Date().toISOString(),
+                timeTaken: tiempoEjecucion,
+                comparaciones: comparaciones,
+                intercambios: intercambios
+            });
+            
+            cargarHistorial();
+        }
+
+        function mostrarHistorialEnPantalla(registros) {
+            historyContainer.innerHTML = '<h3>Historial de Ordenamientos</h3>';
+            registros.reverse().forEach(registro => {
+                const div = document.createElement('div');
+                div.innerHTML = `
+                    <p><strong>${new Date(registro.timestamp).toLocaleString()}</strong></p>
+                    <p>Original: [${registro.arrayOriginal.join(', ')}]</p>
+                    <p>Ordenado: [${registro.arrayOrdenado.join(', ')}]</p>
+                    <p>Tiempo: ${registro.timeTaken}ms | Comparaciones: ${registro.comparaciones} | Intercambios: ${registro.intercambios}</p>
+                    <hr>
+                `;
+                historyContainer.appendChild(div);
+            });
+        }
+
+        // ... (mantener funciones generarArray, renderizarBarras e iniciarSort del código anterior) ...
+    </script>
+</body>
+</html>

@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizador de Bubble Sort</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        .input-section {
+            margin-bottom: 20px;
+        }
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            resize: vertical;
+            min-height: 60px;
+        }
+        .buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            flex: 1;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #generateBtn {
+            background-color: #2196F3;
+        }
+        #generateBtn:hover {
+            background-color: #0b7dda;
+        }
+        #visualization {
+            margin-top: 20px;
+            min-height: 100px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            background-color: #f9f9f9;
+        }
+        .array-container {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-bottom: 20px;
+        }
+        .array-element {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 4px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .array-element.comparing {
+            background-color: #FF5722;
+        }
+        .array-element.sorted {
+            background-color: #2196F3;
+        }
+        .array-element.swapped {
+            background-color: #FFC107;
+            color: #333;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        #speedControl {
+            width: 150px;
+        }
+        .result-section {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e8f5e9;
+            border-radius: 4px;
+            display: none;
+        }
+        .history-section {
+            margin-top: 30px;
+        }
+        .history-item {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Visualizador de Bubble Sort</h1>
+        
+        <div class="input-section">
+            <label for="numbersInput">Ingrese 20 números separados por comas:</label>
+            <textarea id="numbersInput" placeholder="Ejemplo: 5, 3, 8, 4, 2, 7, 1, 10, 6, 9, 15, 12, 18, 14, 11, 20, 16, 13, 17, 19"></textarea>
+        </div>
+        
+        <div class="buttons">
+            <button id="generateBtn">Generar Números Aleatorios</button>
+            <button id="sortBtn" disabled>Ordenar</button>
+        </div>
+        
+        
+        
+        <div id="visualization">
+            <p>Ingrese los números y haga clic en "Ordenar" para comenzar la visualización.</p>
+        </div>
+        
+        <div id="resultSection" class="result-section">
+            <h3>Resultado Final:</h3>
+            <div id="finalResult"></div>
+            <p>Datos guardados con ID: <span id="recordId"></span></p>
+        </div>
+        
+        <div class="history-section" id="historySection" style="display: none;">
+            <h3>Historial de Ordenamientos:</h3>
+            <div id="historyList"></div>
+        </div>
+    </div>
+
+    <script>
+        // Simulated database
+        const database = {
+            records: [],
+            nextId: 1,
+            
+            saveRecord: function(unsorted, sorted) {
+                const record = {
+                    id: this.nextId++,
+                    unsorted: [...unsorted],
+                    sorted: [...sorted],
+                    timestamp: new Date().toISOString()
+                };
+                this.records.unshift(record); // Add to beginning
+                return record;
+            },
+            
+            getRecords: function() {
+                return [...this.records];
+            }
+        };
+
+        // DOM elements
+        const numbersInput = document.getElementById('numbersInput');
+        const generateBtn = document.getElementById('generateBtn');
+        const sortBtn = document.getElementById('sortBtn');
+        const speedControl = document.getElementById('speedControl');
+        const visualization = document.getElementById('visualization');
+        const resultSection = document.getElementById('resultSection');
+        const finalResult = document.getElementById('finalResult');
+        const recordId = document.getElementById('recordId');
+        const historySection = document.getElementById('historySection');
+        const historyList = document.getElementById('historyList');
+
+        // Variables for sorting
+        let array = [];
+        let sorting = false;
+        let sortInterval;
+        let currentStep = 0;
+        let steps = [];
+        let speed = 500;
+
+        // Event listeners
+        generateBtn.addEventListener('click', generateRandomNumbers);
+        sortBtn.addEventListener('click', startSorting);
+        numbersInput.addEventListener('input', validateInput);
+        speedControl.addEventListener('input', updateSpeed);
+
+        // Initialize
+        updateSpeed();
+        loadHistory();
+
+        function validateInput() {
+            const input = numbersInput.value.trim();
+            const numbers = input.split(',').map(num => num.trim()).filter(num => num !== '');
+            
+            if (numbers.length === 20 && numbers.every(num => !isNaN(num))) {
+                sortBtn.disabled = false;
+            } else {
+                sortBtn.disabled = true;
+            }
+        }
+
+        function generateRandomNumbers() {
+            const randomNumbers = [];
+            for (let i = 0; i < 20; i++) {
+                randomNumbers.push(Math.floor(Math.random() * 100) + 1);
+            }
+            numbersInput.value = randomNumbers.join(', ');
+            sortBtn.disabled = false;
+        }
+
+        function updateSpeed() {
+            // Map the 1-10 range to 1000-100ms (faster with higher numbers)
+            speed = 1100 - (speedControl.value * 100);
+        }
+
+        function startSorting() {
+            if (sorting) return;
+            
+            // Parse input
+            array = numbersInput.value.split(',').map(num => parseInt(num.trim()));
+            
+            // Disable controls
+            numbersInput.disabled = true;
+            generateBtn.disabled = true;
+            sortBtn.disabled = true;
+            sorting = true;
+            
+            // Reset visualization
+            visualization.innerHTML = '';
+            resultSection.style.display = 'none';
+            
+            // Prepare steps for visualization
+            steps = [];
+            const arrayCopy = [...array];
+            bubbleSortWithSteps(arrayCopy);
+            
+            // Start visualization
+            currentStep = 0;
+            renderStep();
+            
+            sortInterval = setInterval(() => {
+                currentStep++;
+                if (currentStep < steps.length) {
+                    renderStep();
+                } else {
+                    finishSorting();
+                }
+            }, speed);
+        }
+
+        function bubbleSortWithSteps(arr) {
+            let n = arr.length;
+            let swapped;
+            
+            steps.push({
+                array: [...arr],
+                comparing: [],
+                swapped: false,
+                sortedIndices: []
+            });
+            
+            for (let i = 0; i < n - 1; i++) {
+                swapped = false;
+                
+                // Highlight the range that's already sorted
+                const sortedIndices = [];
+                for (let j = n - i; j < n; j++) {
+                    sortedIndices.push(j);
+                }
+                
+                for (let j = 0; j < n - i - 1; j++) {
+                    // Step: comparing j and j+1
+                    steps.push({
+                        array: [...arr],
+                        comparing: [j, j+1],
+                        swapped: false,
+                        sortedIndices: [...sortedIndices]
+                    });
+                    
+                    if (arr[j] > arr[j + 1]) {
+                        // Swap elements
+                        [arr[j], arr[j + 1]] = [arr[j + 1], arr[j]];
+                        swapped = true;
+                        
+                        // Step: after swap
+                        steps.push({
+                            array: [...arr],
+                            comparing: [j, j+1],
+                            swapped: true,
+                            sortedIndices: [...sortedIndices]
+                        });
+                    }
+                }
+                
+                // If no two elements were swapped, array is sorted
+                if (!swapped) break;
+            }
+            
+            // Final step: all sorted
+            steps.push({
+                array: [...arr],
+                comparing: [],
+                swapped: false,
+                sortedIndices: Array.from({length: n}, (_, i) => i)
+            });
+        }
+
+        function renderStep() {
+            const step = steps[currentStep];
+            const arrayContainer = document.createElement('div');
+            arrayContainer.className = 'array-container';
+            
+            step.array.forEach((num, index) => {
+                const element = document.createElement('div');
+                element.className = 'array-element';
+                element.textContent = num;
+                
+                if (step.comparing.includes(index)) {
+                    element.classList.add('comparing');
+                }
+                
+                if (step.swapped && (index === step.comparing[0] || index === step.comparing[1])) {
+                    element.classList.add('swapped');
+                }
+                
+                if (step.sortedIndices.includes(index)) {
+                    element.classList.add('sorted');
+                }
+                
+                arrayContainer.appendChild(element);
+            });
+            
+            visualization.innerHTML = '';
+            visualization.appendChild(arrayContainer);
+            
+            // Add step information
+            const stepInfo = document.createElement('p');
+            stepInfo.textContent = `Paso ${currentStep + 1} de ${steps.length}`;
+            visualization.appendChild(stepInfo);
+        }
+
+        function finishSorting() {
+            clearInterval(sortInterval);
+            sorting = false;
+            
+            // Enable controls
+            numbersInput.disabled = false;
+            generateBtn.disabled = false;
+            
+            // Show final result
+            const sortedArray = steps[steps.length - 1].array;
+            finalResult.textContent = sortedArray.join(', ');
+            resultSection.style.display = 'block';
+            
+            // Save to database
+            const record = database.saveRecord(array, sortedArray);
+            recordId.textContent = record.id;
+            
+            // Update history
+            loadHistory();
+        }
+
+        function loadHistory() {
+            const records = database.getRecords();
+            
+            if (records.length > 0) {
+                historySection.style.display = 'block';
+                historyList.innerHTML = '';
+                
+                records.forEach(record => {
+                    const item = document.createElement('div');
+                    item.className = 'history-item';
+                    
+                    const date = new Date(record.timestamp).toLocaleString();
+                    item.innerHTML = `
+                        <p><strong>ID:</strong> ${record.id} | <strong>Fecha:</strong> ${date}</p>
+                        <p><strong>Original:</strong> ${record.unsorted.join(', ')}</p>
+                        <p><strong>Ordenado:</strong> ${record.sorted.join(', ')}</p>
+                    `;
+                    
+                    historyList.appendChild(item);
+                });
+            } else {
+                historySection.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
