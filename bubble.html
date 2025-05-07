@@ -156,33 +156,40 @@
         </div>
     </div>
 
-    <script>
-        // Simulated database
-        const database = {
-            records: [],
-            nextId: 1,
-            
-            saveRecord: function(unsorted, sorted) {
-                const record = {
-                    id: this.nextId++,
-                    unsorted: [...unsorted],
-                    sorted: [...sorted],
-                    timestamp: new Date().toISOString()
-                };
-                this.records.unshift(record); // Add to beginning
-                return record;
-            },
-            
-            getRecords: function() {
-                return [...this.records];
+    <script type="module">
+        // Database
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+        const supabaseUrl = "https://fdcwgstfbdpmpryeaylv.supabase.co"
+        const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZkY3dnc3RmYmRwbXByeWVheWx2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY1NzI0ODgsImV4cCI6MjA2MjE0ODQ4OH0.3Vtf8m4uYSpvh7XHYJDI1x289h7fP86p059LANQt7dA"
+        const supabase = createClient(supabaseUrl, supabaseKey)
+
+        // Database functions
+        async function getRecords() {
+            const { data, error } = await supabase.from('history').select('*');
+            if (error) {
+                console.error('Error fetching records:', error);
+                return;
             }
-        };
+
+            return data;
+        }
+
+        function saveRecord(unsorted, sorted) {
+            return supabase.from('history').insert([
+                { unsorted, sorted }
+            ]).then(({ data, error }) => {
+                if (error) {
+                    console.error('Error saving record:', error);
+                } else {
+                    console.log('Record saved');
+                }
+            });
+        }
 
         // DOM elements
         const numbersInput = document.getElementById('numbersInput');
         const generateBtn = document.getElementById('generateBtn');
         const sortBtn = document.getElementById('sortBtn');
-        const speedControl = document.getElementById('speedControl');
         const visualization = document.getElementById('visualization');
         const resultSection = document.getElementById('resultSection');
         const finalResult = document.getElementById('finalResult');
@@ -196,16 +203,14 @@
         let sortInterval;
         let currentStep = 0;
         let steps = [];
-        let speed = 500;
+        let speed = 50;
 
         // Event listeners
         generateBtn.addEventListener('click', generateRandomNumbers);
         sortBtn.addEventListener('click', startSorting);
         numbersInput.addEventListener('input', validateInput);
-        speedControl.addEventListener('input', updateSpeed);
 
         // Initialize
-        updateSpeed();
         loadHistory();
 
         function validateInput() {
@@ -226,11 +231,6 @@
             }
             numbersInput.value = randomNumbers.join(', ');
             sortBtn.disabled = false;
-        }
-
-        function updateSpeed() {
-            // Map the 1-10 range to 1000-100ms (faster with higher numbers)
-            speed = 1100 - (speedControl.value * 100);
         }
 
         function startSorting() {
@@ -359,7 +359,7 @@
             visualization.appendChild(stepInfo);
         }
 
-        function finishSorting() {
+        async function finishSorting() {
             clearInterval(sortInterval);
             sorting = false;
             
@@ -373,15 +373,15 @@
             resultSection.style.display = 'block';
             
             // Save to database
-            const record = database.saveRecord(array, sortedArray);
-            recordId.textContent = record.id;
+            await saveRecord(array.join(','), sortedArray.join(','));
             
             // Update history
-            loadHistory();
+            await loadHistory();
         }
 
-        function loadHistory() {
-            const records = database.getRecords();
+        async function loadHistory() {
+            const records = await getRecords();
+            console.log(records);
             
             if (records.length > 0) {
                 historySection.style.display = 'block';
@@ -393,9 +393,9 @@
                     
                     const date = new Date(record.timestamp).toLocaleString();
                     item.innerHTML = `
-                        <p><strong>ID:</strong> ${record.id} | <strong>Fecha:</strong> ${date}</p>
-                        <p><strong>Original:</strong> ${record.unsorted.join(', ')}</p>
-                        <p><strong>Ordenado:</strong> ${record.sorted.join(', ')}</p>
+                        <p><strong>ID:</strong> ${record.id}
+                        <p><strong>Original:</strong> ${record.unsorted}</p>
+                        <p><strong>Ordenado:</strong> ${record.sorted}</p>
                     `;
                     
                     historyList.appendChild(item);
